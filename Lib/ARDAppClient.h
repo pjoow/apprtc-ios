@@ -28,6 +28,15 @@
 #import <Foundation/Foundation.h>
 
 #import "RTCVideoTrack.h"
+#import "ARDSignalingMessage.h"
+
+
+@interface RTCMessageReceiver : NSObject
+
+- (void)didReceiveMessage:(NSString *)message;
+
+@end
+
 
 typedef NS_ENUM(NSInteger, ARDAppClientState) {
   // Disconnected from servers.
@@ -69,7 +78,10 @@ typedef NS_ENUM(NSInteger, ARDAppClientState) {
 // for call configurations such as overriding server choice, specifying codecs
 // and so on.
 - (void)connectToRoomWithId:(NSString *)roomId
-                    options:(NSDictionary *)options;
+                    options:(NSDictionary *)options
+            messageReceiver:(RTCMessageReceiver *)messageReceiver;
+
+- (void)sendMessage:(NSString *)message;
 
 // Mute and unmute Audio-In
 - (void)muteAudioIn;
