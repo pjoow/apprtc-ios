@@ -94,6 +94,8 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
 @property(nonatomic, strong) RTCAudioTrack *defaultAudioTrack;
 @property(nonatomic, strong) RTCVideoTrack *defaultVideoTrack;
 
+@property(nonatomic, strong) RTCMessageReceiver *messageReceiver;
+
 @end
 
 @implementation ARDAppClient
@@ -168,6 +170,9 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
             messageReceiver:(RTCMessageReceiver *)messageReceiver {
   NSParameterAssert(roomId.length);
   NSParameterAssert(_state == kARDAppClientStateDisconnected);
+    
+    self.messageReceiver = messageReceiver;
+    
   self.state = kARDAppClientStateConnecting;
 
   // Request TURN.
@@ -262,6 +267,11 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
       [self processSignalingMessage:message];
       return;
   }
+
+    if (_messageReceiver != nil) {
+        [_messageReceiver didReceiveMessage:([[NSString alloc] initWithData:message.JSONData encoding:NSUTF8StringEncoding])];
+    }
+    
   [self drainMessageQueueIfReady];
 }
 
