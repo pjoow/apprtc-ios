@@ -255,6 +255,11 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
 - (void)channel:(ARDWebSocketChannel *)channel
     didReceiveMessage:(ARDSignalingMessage *)message {
   switch (message.type) {
+    case kARDSignalingMessageTypeCustomMessage:
+          if (_messageReceiver != nil) {
+              [_messageReceiver didReceiveMessage:([[NSString alloc] initWithData:message.JSONData encoding:NSUTF8StringEncoding])];
+          }
+          break;
     case kARDSignalingMessageTypeOffer:
     case kARDSignalingMessageTypeAnswer:
       _hasReceivedSdp = YES;
@@ -267,10 +272,6 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
       [self processSignalingMessage:message];
       return;
   }
-
-    if (_messageReceiver != nil) {
-        [_messageReceiver didReceiveMessage:([[NSString alloc] initWithData:message.JSONData encoding:NSUTF8StringEncoding])];
-    }
     
   [self drainMessageQueueIfReady];
 }
@@ -675,8 +676,17 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
   [_channel sendData:data];
 }
 
-- (void)sendMessage:(NSString *)message {
-    [_channel sendData:[message dataUsingEncoding:NSUTF8StringEncoding]];
+- (void)sendData:(NSString *)tag
+    data:(NSString *)data {
+    NSLog(@"sendData: ");
+    
+    NSString *payload = [NSString stringWithFormat:(@"{\"type\":\"custom\", \"tag\":\"%@\", \"data\":\"%@\"}", tag, data )];
+    
+    NSLog(payload);
+    
+    ARDSignalingMessage *msg = [ARDSignalingMessage messageFromJSONString:payload];
+
+    [self sendSignalingMessage:(msg)];
 }
 
 #pragma mark - Defaults
