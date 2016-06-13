@@ -164,7 +164,8 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
 }
 
 - (void)connectToRoomWithId:(NSString *)roomId
-                    options:(NSDictionary *)options {
+                    options:(NSDictionary *)options
+            messageReceiver:(RTCMessageReceiver *)messageReceiver {
   NSParameterAssert(roomId.length);
   NSParameterAssert(_state == kARDAppClientStateDisconnected);
   self.state = kARDAppClientStateConnecting;
@@ -664,6 +665,10 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
   [_channel sendData:data];
 }
 
+- (void)sendMessage:(NSString *)message {
+    [_channel sendData:[message dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
 #pragma mark - Defaults
 
 - (RTCMediaConstraints *)defaultMediaStreamConstraints {
@@ -803,5 +808,9 @@ static NSInteger kARDAppClientErrorInvalidRoom = -7;
     [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:nil];
     _isSpeakerEnabled = NO;
 }
+
+@end
+
+@implementation RTCMessageReceiver
 
 @end
