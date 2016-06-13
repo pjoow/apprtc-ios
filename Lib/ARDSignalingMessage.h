@@ -33,7 +33,8 @@
 typedef enum {
   kARDSignalingMessageTypeCandidate,
   kARDSignalingMessageTypeOffer,
-  kARDSignalingMessageTypeAnswer,
+    kARDSignalingMessageTypeCustomMessage,
+    kARDSignalingMessageTypeAnswer,
   kARDSignalingMessageTypeBye,
 } ARDSignalingMessageType;
 
@@ -63,4 +64,15 @@ typedef enum {
 @end
 
 @interface ARDByeMessage : ARDSignalingMessage
+@end
+
+@interface ARDCustomMessage : ARDSignalingMessage
+
+@property(nonatomic, strong) NSString *tag;
+@property(nonatomic, strong) NSString *data;
+
+- (instancetype)initWithTagAndData:(NSString *)tag
+                              data:(NSString *)data;
+
+
 @end
