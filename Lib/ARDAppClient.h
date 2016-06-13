@@ -25,81 +25,144 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <Foundation/Foundation.h>
-
-#import "RTCVideoTrack.h"
 #import "ARDSignalingMessage.h"
 
+#import "ARDUtilities.h"
+#import "RTCICECandidate+JSON.h"
+#import "RTCSessionDescription+JSON.h"
 
-@interface RTCMessageReceiver : NSObject
+static NSString const *kARDSignalingMessageTypeKey = @"type";
 
-- (void)didReceiveMessage:(NSString *)message;
+@implementation ARDSignalingMessage
+
+@synthesize type = _type;
+
+- (instancetype)initWithType:(ARDSignalingMessageType)type {
+  if (self = [super init]) {
+    _type = type;
+  }
+  return self;
+}
+
+- (NSString *)description {
+  return [[NSString alloc] initWithData:[self JSONData]
+                               encoding:NSUTF8StringEncoding];
+}
+
++ (ARDSignalingMessage *)messageFromJSONString:(NSString *)jsonString {
+  NSDictionary *values = [NSDictionary dictionaryWithJSONString:jsonString];
+  if (!values) {
+    NSLog(@"Error parsing signaling message JSON.");
+    return nil;
+  }
+
+  NSString *typeString = values[kARDSignalingMessageTypeKey];
+  ARDSignalingMessage *message = nil;
+  if ([typeString isEqualToString:@"candidate"]) {
+    RTCICECandidate *candidate =
+        [RTCICECandidate candidateFromJSONDictionary:values];
+    message = [[ARDICECandidateMessage alloc] initWithCandidate:candidate];
+  } else if ([typeString isEqualToString:@"offer"] ||
+             [typeString isEqualToString:@"answer"]) {
+    RTCSessionDescription *description =
+        [RTCSessionDescription descriptionFromJSONDictionary:values];
+    message =
+        [[ARDSessionDescriptionMessage alloc] initWithDescription:description];
+  } else if ([typeString isEqualToString:@"bye"]) {
+    message = [[ARDByeMessage alloc] init];
+  } else if ([typeString isEqualToString:@"custom"]) {
+      message = [[ARDCustomMessage alloc] initWithTagAndData:values[@"tag"] data:values[@"data"]];
+}
+  
+  else {
+    NSLog(@"Unexpected type: %@", typeString);
+  }
+  return message;
+}
+
+- (NSData *)JSONData {
+  return nil;
+}
+
+@end
+
+@implementation ARDICECandidateMessage
+
+@synthesize candidate = _candidate;
+
+- (instancetype)initWithCandidate:(RTCICECandidate *)candidate {
+  if (self = [super initWithType:kARDSignalingMessageTypeCandidate]) {
+    _candidate = candidate;
+  }
+  return self;
+}
+
+- (NSData *)JSONData {
+  return [_candidate JSONData];
+}
+
+@end
+
+@implementation ARDSessionDescriptionMessage
+
+@synthesize sessionDescription = _sessionDescription;
+
+- (instancetype)initWithDescription:(RTCSessionDescription *)description {
+  ARDSignalingMessageType type = kARDSignalingMessageTypeOffer;
+  NSString *typeString = description.type;
+  if ([typeString isEqualToString:@"offer"]) {
+    type = kARDSignalingMessageTypeOffer;
+  } else if ([typeString isEqualToString:@"answer"]) {
+    type = kARDSignalingMessageTypeAnswer;
+  } else {
+    NSAssert(NO, @"Unexpected type: %@", typeString);
+  }
+  if (self = [super initWithType:type]) {
+    _sessionDescription = description;
+  }
+  return self;
+}
+
+- (NSData *)JSONData {
+  return [_sessionDescription JSONData];
+}
+
+@end
+
+@implementation ARDByeMessage
+
+- (instancetype)init {
+  return [super initWithType:kARDSignalingMessageTypeBye];
+}
+
+- (NSData *)JSONData {
+  NSDictionary *message = @{
+    @"type": @"bye"
+  };
+  return [NSJSONSerialization dataWithJSONObject:message
+                                         options:NSJSONWritingPrettyPrinted
+                                           error:NULL];
+}
 
 @end
 
 
-typedef NS_ENUM(NSInteger, ARDAppClientState) {
-  // Disconnected from servers.
-  kARDAppClientStateDisconnected,
-  // Connecting to servers.
-  kARDAppClientStateConnecting,
-  // Connected to servers.
-  kARDAppClientStateConnected,
-};
+@implementation ARDCustomMessage
 
-@class ARDAppClient;
-@protocol ARDAppClientDelegate <NSObject>
+- (instancetype)initWithTagAndData:(NSString *)tag
+    data:(NSString *)data {
+        self.tag = tag;
+        self.data = data;
+    return [super initWithType:kARDSignalingMessageTypeCustomMessage];
+}
 
-- (void)appClient:(ARDAppClient *)client
-    didChangeState:(ARDAppClientState)state;
-
-- (void)appClient:(ARDAppClient *)client
-    didReceiveLocalVideoTrack:(RTCVideoTrack *)localVideoTrack;
-
-- (void)appClient:(ARDAppClient *)client
-    didReceiveRemoteVideoTrack:(RTCVideoTrack *)remoteVideoTrack;
-
-- (void)appClient:(ARDAppClient *)client
-         didError:(NSError *)error;
-
-@end
-
-// Handles connections to the AppRTC server for a given room.
-@interface ARDAppClient : NSObject
-
-@property(nonatomic, readonly) ARDAppClientState state;
-@property(nonatomic, weak) id<ARDAppClientDelegate> delegate;
-@property(nonatomic, strong) NSString *serverHostUrl;
-
-- (instancetype)initWithDelegate:(id<ARDAppClientDelegate>)delegate;
-
-// Establishes a connection with the AppRTC servers for the given room id.
-// TODO(tkchin): provide available keys/values for options. This will be used
-// for call configurations such as overriding server choice, specifying codecs
-// and so on.
-- (void)connectToRoomWithId:(NSString *)roomId
-                    options:(NSDictionary *)options
-            messageReceiver:(RTCMessageReceiver *)messageReceiver;
-
-- (void)sendMessage:(NSString *)message;
-
-// Mute and unmute Audio-In
-- (void)muteAudioIn;
-- (void)unmuteAudioIn;
-
-// Mute and unmute Video-In
-- (void)muteVideoIn;
-- (void)unmuteVideoIn;
-
-// Enabling / Disabling Speakerphone
-- (void)enableSpeaker;
-- (void)disableSpeaker;
-
-// Swap camera functionality
-- (void)swapCameraToFront;
-- (void)swapCameraToBack;
-
-// Disconnects from the AppRTC servers and any connected clients.
-- (void)disconnect;
+- (NSData *)JSONData {
+    NSDictionary *message = @{
+                              @"type": @"custom", @"tag": self.tag, @"data": self.data
+                              };    
+    return [NSJSONSerialization dataWithJSONObject:message
+                                           options:NSJSONWritingPrettyPrinted
+                                             error:NULL];
+}
 
 @end
